@@ -1,6 +1,6 @@
 # Bulk Rename CLI
 
-A simple CLI tool that helps you rename and reorganize files by editing a list in your text editor.
+A simple CLI tool that helps you rename and reorganize files by editing a list in VSCode.
 
 ## Features
 
@@ -33,7 +33,7 @@ This will:
 3. Wait for you to make changes and save
 4. Process the changes by moving and renaming the files as needed
 
-## 📝 Example
+## Example
 
 Original structure:
 
