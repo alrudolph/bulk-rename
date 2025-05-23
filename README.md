@@ -15,7 +15,7 @@ A simple CLI tool that helps you rename and reorganize files by editing a list i
 ## Installation
 
 ```bash
-go install github.com/alrudolph/bulk-rename@latest
+go get github.com/alrudolph/bulk-rename@latest
 ```
 
 Make sure `$(go env GOPATH)/bin` is in your `PATH`.
