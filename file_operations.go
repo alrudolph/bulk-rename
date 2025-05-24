@@ -148,7 +148,11 @@ func handleDiffNew(root string, oldFiles, newFiles []string) error {
 	if i < len(files) {
 		for j := 0; j < i; j++ {
 			// todo: collect errors?
-			files[i].DeleteDestination(root)
+			err := files[i].DeleteDestination(root)
+
+			if err != nil {
+				return fmt.Errorf("failed to delete %s: %v", files[i].dst, err)
+			}
 		}
 
 		return fmt.Errorf("failed to copy %s to %s: %v", files[i].src, files[i].dst, err)
@@ -156,7 +160,11 @@ func handleDiffNew(root string, oldFiles, newFiles []string) error {
 
 	for _, file := range files {
 		// todo: collect errors?
-		file.DeleteSource(root)
+		err := file.DeleteSource(root)
+
+		if err != nil {
+			return fmt.Errorf("failed to delete original %s: %v", file.src, err)
+		}
 	}
 
 	return nil
