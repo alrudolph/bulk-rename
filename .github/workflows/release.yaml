@@ -46,7 +46,7 @@ jobs:
                 goosarch:
                 - linux/amd64
                 - darwin/arm64
-                - windows/amd64
+                # - windows/amd64
         steps:
         - name: Checkout code
           uses: actions/checkout@v4
