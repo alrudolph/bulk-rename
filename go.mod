@@ -1,6 +1,6 @@
 module github.com/alrudolph/bulk-rename
 
-go 1.22.6
+go 1.23
 
 require (
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00
