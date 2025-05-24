@@ -14,6 +14,14 @@ A simple CLI tool that helps you rename and reorganize files by editing a list i
 
 ## Installation
 
+### General
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alrudolph/bulk-rename/main/install.sh | bash
+```
+
+### Via Go
+
 ```bash
 go get github.com/alrudolph/bulk-rename@latest
 ```

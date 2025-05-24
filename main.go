@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
 )
@@ -29,18 +29,12 @@ var RootCmd = &cobra.Command{
 }
 
 func main() {
-	err := RootCmd.Execute()
-	if err != nil {
+	if err := RootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
-func init() {
-}
-
 func rootCommand(root string) {
-	// root := "/home/alex/projs/merced/src/spec"
-	// root := "test copy"
 	files := []string{}
 
 	WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -61,130 +55,79 @@ func rootCommand(root string) {
 	if _, err := tmpFile.WriteString(strings.Join(files, "\n")); err != nil {
 		panic(err)
 	}
+
 	tmpFile.Close()
 
 	fmt.Println("Close the editor to rename files")
 
-	if err := launchVscode(tmpFile.Name()); err != nil {
+	if err := launchEditor(tmpFile.Name()); err != nil {
 		fmt.Fprintf(os.Stderr, "Editor exited with error: %v\n", err)
 		return
 	}
 
 	data, err := os.ReadFile(tmpFile.Name())
+
 	if err != nil {
 		panic(err)
 	}
 
 	newFiles := strings.Split(string(data), "\n")
 
-	// TODO: check result is exactly the same length
-	if err = handleDiff(root, files, newFiles); err != nil {
+	if err = handleDiffNew(root, files, newFiles); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to handle diff: %v\n", err)
 		return
 	}
 }
 
-func launchVscode(fileName string) error {
-	cmd := exec.Command("code", "--wait", fileName)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
+func launchEditor(fileName string) error {
+	editors := []string{}
 
-func handleDiff(root string, oldFiles, newFiles []string) error {
-	for i, oldFile := range oldFiles {
-		newFile := newFiles[i]
-		src := filepath.Join(root, oldFile)
-		dst := filepath.Join(root, newFile)
+	if editorEnv := os.Getenv("EDITOR"); editorEnv != "" {
+		editors = append(editors, editorEnv)
+	}
 
-		// maybe verbose mode
-		// fmt.Printf("Copying %s -> %s\n", oldFile, newFile)
-		err := copyAndRemoveNested(root, src, dst)
+	editors = append(editors, "code", "nano", "vim", "vi")
+	for _, editor := range editors {
+		cmd := exec.Command(editor, fileName)
 
-		if err != nil {
-			return err
+		if editor == "code" {
+			cmd = exec.Command("code", "--wait", fileName)
+		}
+
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if editor == "code" {
+			fmt.Println("CTRL-C to cancel")
+
+			cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+			sigChan := make(chan os.Signal, 1)
+			signal.Notify(sigChan, os.Interrupt)
+
+			go func() {
+				<-sigChan
+				if cmd.Process != nil {
+					syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
+				}
+			}()
+		}
+
+		err := cmd.Run()
+
+		if err == nil {
+			fmt.Println("Editor exited normally")
+			return nil
+		}
+
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			status, ok := exitErr.Sys().(syscall.WaitStatus)
+			if ok && status.Signaled() {
+				return fmt.Errorf("editor was killed by signal: %s", status.Signal())
+			}
 		}
 	}
 
-	return nil
-}
-
-func copyAndRemoveNested(root, src, dst string) error {
-	if src == dst {
-		return nil
-	}
-
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-		return fmt.Errorf("failed to create directory for %s: %w", dst, err)
-	}
-
-	if err := copyFile(src, dst); err != nil {
-		return fmt.Errorf("failed to copy %s to %s: %w", src, dst, err)
-	}
-
-	// maybe I should do all of the copying first and then all of the deleting
-	if err := os.Remove(src); err != nil {
-		return fmt.Errorf("failed to delete original %s: %w", src, err)
-	}
-
-	return removeEmptyDirsUp(filepath.Dir(src), root)
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-
-	if err != nil {
-		return err
-	}
-
-	defer in.Close()
-
-	out, err := os.Create(dst)
-
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if cerr := out.Close(); cerr != nil && err == nil {
-			err = cerr
-		}
-	}()
-
-	_, err = io.Copy(out, in)
-
-	return err
-}
-
-func removeEmptyDirsUp(path, stop string) error {
-	for path != stop && path != "." {
-		if empty, err := isDirEmpty(path); err != nil || !empty {
-			return err
-		}
-
-		os.Remove(path)
-
-		path = filepath.Dir(path)
-	}
-
-	return nil
-}
-
-func isDirEmpty(path string) (bool, error) {
-	f, err := os.Open(path)
-
-	if err != nil {
-		return false, err
-	}
-
-	defer f.Close()
-
-	_, err = f.Readdirnames(1)
-
-	if err == io.EOF {
-		return true, nil
-	}
-
-	return false, err
+	return fmt.Errorf("no suitable editor found. please set $EDITOR or install nano/vim/code")
 }
