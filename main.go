@@ -98,6 +98,8 @@ func launchEditor(fileName string) error {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
+		errChan := make(chan error)
+
 		if editor == "code" {
 			fmt.Println("CTRL-C to cancel")
 
@@ -109,7 +111,8 @@ func launchEditor(fileName string) error {
 			go func() {
 				<-sigChan
 				if cmd.Process != nil {
-					syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
+					err := syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
+					errChan <- err
 				}
 			}()
 		}
@@ -126,6 +129,10 @@ func launchEditor(fileName string) error {
 			if ok && status.Signaled() {
 				return fmt.Errorf("editor was killed by signal: %s", status.Signal())
 			}
+		}
+
+		if <-errChan != nil {
+			return fmt.Errorf("could not kill editor process: %v", err)
 		}
 	}
 
