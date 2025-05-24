@@ -37,12 +37,17 @@ func main() {
 func rootCommand(root string) {
 	files := []string{}
 
-	WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	err := WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if !d.IsDir() {
 			files = append(files, path)
 		}
 		return err
 	})
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to walk directory: %v\n", err)
+		return
+	}
 
 	tmpFile, err := os.CreateTemp(".", "cli-input-*.txt")
 
