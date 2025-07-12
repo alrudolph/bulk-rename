@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 
@@ -24,7 +25,18 @@ var RootCmd = &cobra.Command{
 
 		root = strings.TrimPrefix(root, "./")
 
-		rootCommand(root)
+		dir, err := os.Getwd()
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to get current working directory: %v\n", err)
+			os.Exit(1)
+		}
+
+		if !strings.HasPrefix(root, "/") {
+			root = path.Join(dir, root)
+		}
+
+		rootCommand(dir, root)
 	},
 }
 
@@ -34,10 +46,10 @@ func main() {
 	}
 }
 
-func rootCommand(root string) {
+func rootCommand(cwd, root string) {
 	files := []string{}
 
-	err := WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	err := WalkDir(cwd, root, func(path string, d os.DirEntry, err error) error {
 		if !d.IsDir() {
 			files = append(files, path)
 		}
